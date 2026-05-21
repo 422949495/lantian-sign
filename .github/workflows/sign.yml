@@ -1,0 +1,26 @@
+name: Daily Sign
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 每天 UTC 0:00 运行，可改成北京时间 8:00 对应 UTC 0:00
+  workflow_dispatch:       # 允许手动触发
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run sign script
+        env:
+          COOKIE: ${{ secrets.SIGN_COOKIE }}
+        run: python sign.py
