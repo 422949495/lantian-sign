@@ -15,7 +15,8 @@ def parse_cookie_string(cookie_str):
     return cookies
 
 def sign():
-    url = "https://www.ltyun.top/console/php/index.php?action=qiandao"
+    # ！！恢复你抓包时的原始 URL（双斜杠）！！
+    url = "https://www.ltyun.top/console//php/index.php?action=qiandao"
     headers = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -27,7 +28,7 @@ def sign():
         "sec-ch-ua": '"Chromium";v="148", "Microsoft Edge";v="148", "Not/A)Brand";v="99"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
-        "X-Requested-With": "XMLHttpRequest",   # 关键新增
+        "X-Requested-With": "XMLHttpRequest",
     }
 
     cookie_str = os.environ["COOKIE"]
@@ -36,8 +37,12 @@ def sign():
     session = requests.Session()
     session.cookies.update(cookies_dict)
 
-    # ---- 第一步：先访问控制台首页，激活会话 ----
-    print("正在访问首页预热会话...")
+    # 调试输出：确认解析后的 Cookie
+    print("当前使用的 Cookies:")
+    for k, v in session.cookies.get_dict().items():
+        print(f"  {k}: {v[:30] if len(v) > 30 else v}")  # 只打印前30字符避免刷屏
+
+    print("\n正在访问首页预热...")
     try:
         pre_resp = session.get(
             "https://www.ltyun.top/console/",
@@ -45,30 +50,22 @@ def sign():
             timeout=10
         )
         print(f"首页状态码: {pre_resp.status_code}")
-        # 打印响应头，看是否有 Set-Cookie
-        if "Set-Cookie" in pre_resp.headers:
-            print("首页返回了新的 Set-Cookie:", pre_resp.headers["Set-Cookie"][:100])
-        else:
-            print("首页未设置新 Cookie")
     except Exception as e:
         print(f"首页请求异常（可忽略）: {e}")
 
-    # ---- 第二步：签到 ----
-    print("正在签到...")
+    print("\n正在签到...")
     try:
         resp = session.post(url, headers=headers, data={"aiandao": "true"}, timeout=10)
         print(f"签到状态码: {resp.status_code}")
-        print(f"签到响应头: {dict(resp.headers)}")
         print(f"签到响应体前300字符: {resp.text[:300]}")
         if not resp.text.strip():
-            print("⚠️ 服务器返回空响应，可能原因：")
-            print("  1. Cookie 中的 PHPSESSID 已过期，请重新登录并复制完整 Cookie")
-            print("  2. 网站需要额外的请求头（如 CSRF Token），请检查 Network 请求")
-            print("  3. GitHub Actions 的出口 IP 被服务器屏蔽（可能性较低）")
+            print("⚠️ 仍然空响应，请确认：")
+            print("  1. Secrets 中的 COOKIE 是否为最新抓包的完整 Cookie")
+            print("  2. 是否包含了 Transfers 等全部字段")
             return
         result = resp.json()
     except Exception as e:
-        print(f"❌ 签到请求或解析失败: {e}")
+        print(f"❌ 请求或解析失败: {e}")
         return
 
     if result.get("status"):
