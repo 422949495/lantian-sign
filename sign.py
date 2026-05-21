@@ -2,7 +2,6 @@ import os
 import requests
 
 def parse_cookie_string(cookie_str):
-    """将 Cookie 字符串解析为字典，保留原始值（包括乱码）。"""
     cookies = {}
     for item in cookie_str.split(';'):
         item = item.strip()
@@ -16,7 +15,7 @@ def parse_cookie_string(cookie_str):
     return cookies
 
 def sign():
-    url = "https://www.ltyun.top/console//php/index.php?action=qiandao"
+    url = "https://www.ltyun.top/console/php/index.php?action=qiandao"  # 先尝试去掉双斜杠
     headers = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -30,20 +29,22 @@ def sign():
         "sec-ch-ua-platform": '"Windows"',
     }
 
-    # 从环境变量读取完整的 Cookie 字符串
     cookie_str = os.environ["COOKIE"]
     cookies_dict = parse_cookie_string(cookie_str)
 
     session = requests.Session()
-    # 将解析后的 cookies 设置到 session 中
     session.cookies.update(cookies_dict)
 
     try:
         resp = session.post(url, headers=headers, data={"aiandao": "true"})
-        resp.raise_for_status()
+        print(f"状态码: {resp.status_code}")
+        print(f"响应内容前200字符: {resp.text[:200]}")  # 防止日志过长
+        if not resp.text.strip():
+            print("⚠️ 服务器返回了空响应，可能是Cookie失效或路径错误")
+            return
         result = resp.json()
     except Exception as e:
-        print(f"❌ 请求或解析失败: {e}")
+        print(f"❌ 失败: {e}")
         return
 
     if result.get("status"):
