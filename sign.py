@@ -1,6 +1,20 @@
 import os
 import requests
 
+def parse_cookie_string(cookie_str):
+    """将 Cookie 字符串解析为字典，保留原始值（包括乱码）。"""
+    cookies = {}
+    for item in cookie_str.split(';'):
+        item = item.strip()
+        if not item:
+            continue
+        if '=' in item:
+            key, value = item.split('=', 1)
+            cookies[key.strip()] = value.strip()
+        else:
+            cookies[item.strip()] = ''
+    return cookies
+
 def sign():
     url = "https://www.ltyun.top/console//php/index.php?action=qiandao"
     headers = {
@@ -14,12 +28,19 @@ def sign():
         "sec-ch-ua": '"Chromium";v="148", "Microsoft Edge";v="148", "Not/A)Brand";v="99"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
-        "Cookie": os.environ["COOKIE"]
     }
 
+    # 从环境变量读取完整的 Cookie 字符串
+    cookie_str = os.environ["COOKIE"]
+    cookies_dict = parse_cookie_string(cookie_str)
+
+    session = requests.Session()
+    # 将解析后的 cookies 设置到 session 中
+    session.cookies.update(cookies_dict)
+
     try:
-        resp = requests.post(url, headers=headers, data={"aiandao": "true"})
-        resp.raise_for_status()          # 如果 HTTP 状态码不是 2xx 则抛出异常
+        resp = session.post(url, headers=headers, data={"aiandao": "true"})
+        resp.raise_for_status()
         result = resp.json()
     except Exception as e:
         print(f"❌ 请求或解析失败: {e}")
@@ -31,7 +52,6 @@ def sign():
         print(f"✅ 签到成功！获得 {amount}，消息: {message}")
     else:
         message = result.get("message", "")
-        # 检查是否为“已签到”类提示
         if any(keyword in message for keyword in ["已签到", "已经签到", "重复签到", "今日已签"]):
             print(f"ℹ️ 今日已手动签到，无需重复操作。服务器返回: {message}")
         else:
