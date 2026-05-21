@@ -2,6 +2,7 @@ import os
 import requests
 
 def parse_cookie_string(cookie_str):
+    """解析 Cookie 字符串，但过滤掉包含非 Latin-1 字符的字段"""
     cookies = {}
     for item in cookie_str.split(';'):
         item = item.strip()
@@ -9,14 +10,20 @@ def parse_cookie_string(cookie_str):
             continue
         if '=' in item:
             key, value = item.split('=', 1)
-            cookies[key.strip()] = value.strip()
+            key = key.strip()
+            value = value.strip()
+            # 如果值包含非 Latin-1 字符，直接跳过这个字段
+            try:
+                value.encode('latin-1')
+                cookies[key] = value
+            except UnicodeEncodeError:
+                print(f"⚠️ 已跳过无法编码的 Cookie 字段: {key}")
         else:
             cookies[item.strip()] = ''
     return cookies
 
 def sign():
-    # ！！恢复你抓包时的原始 URL（双斜杠）！！
-    url = "https://www.ltyun.top/console//php/index.php?action=qiandao"
+    url = "https://www.ltyun.top/console//php/index.php?action=qiandao"  # 保持双斜杠
     headers = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -34,38 +41,35 @@ def sign():
     cookie_str = os.environ["COOKIE"]
     cookies_dict = parse_cookie_string(cookie_str)
 
+    if not cookies_dict:
+        print("❌ 没有找到任何有效的 Cookie 字段，请检查 Secrets 中的 COOKIE 值")
+        return
+
+    print("当前使用的 Cookies (过滤后):")
+    for k, v in cookies_dict.items():
+        print(f"  {k}: {v}")
+
     session = requests.Session()
     session.cookies.update(cookies_dict)
 
-    # 调试输出：确认解析后的 Cookie
-    print("当前使用的 Cookies:")
-    for k, v in session.cookies.get_dict().items():
-        print(f"  {k}: {v[:30] if len(v) > 30 else v}")  # 只打印前30字符避免刷屏
-
-    print("\n正在访问首页预热...")
+    # 预热首页
+    print("\n正在访问首页...")
     try:
-        pre_resp = session.get(
-            "https://www.ltyun.top/console/",
-            headers=headers,
-            timeout=10
-        )
+        pre_resp = session.get("https://www.ltyun.top/console/", headers=headers, timeout=10)
         print(f"首页状态码: {pre_resp.status_code}")
     except Exception as e:
         print(f"首页请求异常（可忽略）: {e}")
 
+    # 签到
     print("\n正在签到...")
     try:
         resp = session.post(url, headers=headers, data={"aiandao": "true"}, timeout=10)
-        print(f"签到状态码: {resp.status_code}")
-        print(f"签到响应体前300字符: {resp.text[:300]}")
-        if not resp.text.strip():
-            print("⚠️ 仍然空响应，请确认：")
-            print("  1. Secrets 中的 COOKIE 是否为最新抓包的完整 Cookie")
-            print("  2. 是否包含了 Transfers 等全部字段")
-            return
+        resp.raise_for_status()
         result = resp.json()
     except Exception as e:
         print(f"❌ 请求或解析失败: {e}")
+        if 'resp' in locals() and resp.text:
+            print(f"服务器返回内容: {resp.text[:200]}")
         return
 
     if result.get("status"):
